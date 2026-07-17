@@ -1,28 +1,28 @@
-// ========== Xử lý response RevenueCat ========== //
-// @nguyencongan - Bypass Locket Gold
+// ========== Xử lý response RevenueCat - Locket Gold ========== //
+// @nguyencongan
 
-// Bản đồ User-Agent -> Entitlement ID và Product ID
+// Bản đồ User-Agent -> [Entitlement ID, Product ID]
 const mapping = {
   '%E8%BD%A6%E7%A5%A8%E7%A5%A8': ['vip+watch_vip'],
   'Locket': ['Gold']
 };
 
-// Đọc User-Agent từ request
+// Lấy User-Agent từ request
 var ua = $request.headers["User-Agent"] || $request.headers["user-agent"] || "";
 
 // Parse response body
 var obj = JSON.parse($response.body);
 
-// Đảm bảo obj.subscriber tồn tại
+// Tạo cấu trúc subscriber nếu chưa có
 if (!obj.subscriber) obj.subscriber = {};
 if (!obj.subscriber.subscriptions) obj.subscriber.subscriptions = {};
 if (!obj.subscriber.entitlements) obj.subscriber.entitlements = {};
 
-// Thêm thông báo (tùy chọn)
+// Thông báo (tuỳ chọn)
 obj.Attention = "Chúc mừng bạn! Vui lòng không bán hoặc chia sẻ cho người khác!";
 
-// Dữ liệu subscription giả
-var nguyencongan = {
+// Dữ liệu subscription giả (dành cho product)
+var fakeSubscription = {
   is_sandbox: 1,
   ownership_type: "PURCHASED",
   billing_issues_detected_at: null,
@@ -36,31 +36,34 @@ var nguyencongan = {
 };
 
 // Dữ liệu entitlement Gold
-var gold_data = {
+var goldEntitlement = {
   grace_period_expires_date: null,
   purchase_date: "2005-05-25T01:04:17Z",
-  product_identifier: "com.nguyencongan.premium.yearly", // ĐÚNG field name
+  product_identifier: "com.nguyencongan.premium.yearly",  // ĐÚNG field name
   expires_date: "2099-12-18T01:04:17Z"
 };
 
 // Tìm mapping khớp với User-Agent
-var match = Object.keys(mapping).find(function(e) {
-  return ua.includes(e);
+var match = Object.keys(mapping).find(function(key) {
+  return ua.includes(key);
 });
 
 if (match) {
-  var entry = mapping[match];
-  var entitlementId = entry[0];
-  var productId = entry[1] || "com.nguyencongan.premium.yearly";
-  
-  // Gán subscription với productId
-  obj.subscriber.subscriptions[productId] = nguyencongan;
-  // Gán entitlement
-  obj.subscriber.entitlements[entitlementId] = gold_data;
+  var entId = mapping[match][0];
+  var prodId = mapping[match][1] || "com.nguyencongan.premium.yearly";
+  obj.subscriber.subscriptions[prodId] = fakeSubscription;
+  obj.subscriber.entitlements[entId] = goldEntitlement;
 } else {
-  // Mặc định
-  obj.subscriber.subscriptions["com.nguyencongan.premium.yearly"] = nguyencongan;
-  obj.subscriber.entitlements["Gold"] = gold_data;
+  // Mặc định nếu không match
+  obj.subscriber.subscriptions["com.nguyencongan.premium.yearly"] = fakeSubscription;
+  obj.subscriber.entitlements["Gold"] = goldEntitlement;
+}
+
+// Đảm bảo có active_subscriptions (nếu cần)
+if (!obj.subscriber.active_subscriptions) {
+  obj.subscriber.active_subscriptions = ["com.nguyencongan.premium.yearly"];
+} else if (obj.subscriber.active_subscriptions.indexOf("com.nguyencongan.premium.yearly") === -1) {
+  obj.subscriber.active_subscriptions.push("com.nguyencongan.premium.yearly");
 }
 
 // Trả về body đã sửa
