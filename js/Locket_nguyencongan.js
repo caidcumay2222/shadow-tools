@@ -1,16 +1,27 @@
-// ========= ID ========= //
+// ========== Xử lý response RevenueCat ========== //
+// @nguyencongan - Bypass Locket Gold
+
+// Bản đồ User-Agent -> Entitlement ID và Product ID
 const mapping = {
   '%E8%BD%A6%E7%A5%A8%E7%A5%A8': ['vip+watch_vip'],
   'Locket': ['Gold']
 };
 
-// ========= Phân cổ định ========= //
-// @nguyencongan
-var ua = $request.headers["User-Agent"] || $request.headers["user-agent"], 
-    obj = JSON.parse($response.body);
+// Đọc User-Agent từ request
+var ua = $request.headers["User-Agent"] || $request.headers["user-agent"] || "";
 
+// Parse response body
+var obj = JSON.parse($response.body);
+
+// Đảm bảo obj.subscriber tồn tại
+if (!obj.subscriber) obj.subscriber = {};
+if (!obj.subscriber.subscriptions) obj.subscriber.subscriptions = {};
+if (!obj.subscriber.entitlements) obj.subscriber.entitlements = {};
+
+// Thêm thông báo (tùy chọn)
 obj.Attention = "Chúc mừng bạn! Vui lòng không bán hoặc chia sẻ cho người khác!";
 
+// Dữ liệu subscription giả
 var nguyencongan = {
   is_sandbox: 1,
   ownership_type: "PURCHASED",
@@ -24,27 +35,33 @@ var nguyencongan = {
   store: "app_store"
 };
 
+// Dữ liệu entitlement Gold
 var gold_data = {
   grace_period_expires_date: null,
   purchase_date: "2005-05-25T01:04:17Z",
-  product_identifiers: "com.nguyencongan.premium.yearly",
+  product_identifier: "com.nguyencongan.premium.yearly", // ĐÚNG field name
   expires_date: "2099-12-18T01:04:17Z"
 };
 
-match = Object.keys(mapping).find(e => ua.includes(e));
+// Tìm mapping khớp với User-Agent
+var match = Object.keys(mapping).find(function(e) {
+  return ua.includes(e);
+});
 
 if (match) {
-  let [e, s] = mapping[match];
-  if (s) {
-    gold_data.product_identifiers = s;
-    obj.subscriber.subscriptions[s] = nguyencongan;
-  } else {
-    obj.subscriber.subscriptions["com.nguyencongan.premium.yearly"] = nguyencongan;
-  }
-  obj.subscriber.entitlements[e] = gold_data;
+  var entry = mapping[match];
+  var entitlementId = entry[0];
+  var productId = entry[1] || "com.nguyencongan.premium.yearly";
+  
+  // Gán subscription với productId
+  obj.subscriber.subscriptions[productId] = nguyencongan;
+  // Gán entitlement
+  obj.subscriber.entitlements[entitlementId] = gold_data;
 } else {
+  // Mặc định
   obj.subscriber.subscriptions["com.nguyencongan.premium.yearly"] = nguyencongan;
   obj.subscriber.entitlements["Gold"] = gold_data;
 }
 
-$done({body: JSON.stringify(obj)});
+// Trả về body đã sửa
+$done({ body: JSON.stringify(obj) });
